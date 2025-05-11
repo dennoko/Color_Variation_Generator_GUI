@@ -22,7 +22,7 @@ class ImageVariationGenerator(DnDCustomTk):
         ctk.set_appearance_mode("dark")  # ダークモード
         ctk.set_default_color_theme("blue")  # カラーテーマ
         
-        self.title("画像色調バリエーション生成アプリ")
+        self.title("Color Variation Generator")
         self.geometry("900x700")
         self.minsize(900, 700)
         
@@ -386,8 +386,7 @@ class ImageVariationGenerator(DnDCustomTk):
                 hue_shift = int(h * hue_step)
                 
                 for s in range(sat_var_count):
-                    # 彩度係数を修正: 33%, 66%, 100%になるように変更
-                    # (s + 1) / sat_var_count が 1/3, 2/3, 3/3 (1.0)になるようにする
+                    # 彩度の調整
                     sat_factor = (s + 1) / sat_var_count
                     
                     # 色相と彩度を組み合わせて調整

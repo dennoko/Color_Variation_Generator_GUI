@@ -14,6 +14,14 @@ from typing import List, Dict, Tuple, Optional, Union
 import shutil
 import tkinter as tk
 
+# Import TkinterDnD for drag and drop
+try:
+    import tkinterdnd2
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    has_dnd = True
+except ImportError:
+    has_dnd = False
+
 # Set the appearance mode and color theme
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
@@ -21,6 +29,11 @@ ctk.set_default_color_theme("dark-blue")
 class ColorVariationGenerator:
     def __init__(self, root):
         self.root = root
+        
+        # Initialize TkinterDnD if available
+        if has_dnd and not isinstance(self.root, tkinterdnd2.TkinterDnD.Tk):
+            self.root = tkinterdnd2.TkinterDnD.Tk.call('tk', 'windowingsystem') == 'win32' and tkinterdnd2.DnDWrapper(self.root).TkdndVersion > '2.9.2'
+        
         self.root.title("Color Variation Generator")
         self.root.geometry("1200x800")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -283,35 +296,76 @@ class ColorVariationGenerator:
         self.progress_label.pack(anchor="w", pady=(0, 5))
         
     def setup_drag_drop(self):
-        """Setup simplified file selection."""
-        # 画像選択のためのクリックイベントはcreate_preview_areaで設定済み
-        self.log("プレビューエリアをクリックしてファイルを選択できます", level="info")
+        """Setup simplified drag and drop with paste functionality."""
+        self.log("プレビューエリアにファイルをドラッグ＆ドロップするか、クリックしてファイルを選択できます", level="info")
+        
+        # Bind keyboard events for paste
+        self.root.bind("<Control-v>", self.on_paste)
+        
+        # Create visual indicator for drag
+        self.preview_canvas.bind("<Enter>", lambda e: self.update_canvas_style(True))
+        self.preview_canvas.bind("<Leave>", lambda e: self.update_canvas_style(False))
+
+    def update_canvas_style(self, is_hover):
+        """Update canvas style for drag visual feedback."""
+        if is_hover:
+            self.preview_canvas.config(bg="#3b3b3b")
+            if self.input_image is None:
+                self.preview_canvas.delete("all")
+                self.preview_canvas.create_text(
+                    150, 150, 
+                    text="Drop image here or click to browse", 
+                    fill="white", font=("Arial", 14)
+                )
+        else:
+            self.preview_canvas.config(bg="#2b2b2b")
+            if self.input_image is None:
+                self.preview_canvas.delete("all")
+                self.preview_canvas.create_text(
+                    150, 150, 
+                    text="Click here to browse for an image", 
+                    fill="white", font=("Arial", 14)
+                )
+
+    def on_paste(self, event):
+        """Handle pasted image data."""
+        try:
+            if not self.root.clipboard_get():
+                return
+                
+            # Try to get file path from clipboard
+            file_path = self.root.clipboard_get()
+            if os.path.isfile(file_path) and self.is_valid_image_file(file_path):
+                self.load_image(file_path)
+                self.log(f"Pasted image loaded: {os.path.basename(file_path)}", level="info")
+        except Exception:
+            # Not a valid file path
+            pass
 
     def on_drop(self, event):
         """Handle dropped files."""
         try:
+            # Get the dropped file path
             file_path = event.data
             
-            # Handle file path based on OS
+            # Handle Windows paths (may have curly braces or file:/// prefix)
             if sys.platform == 'win32':
-                # Windows paths might be enclosed in {} or have file:/// prefix
                 file_path = file_path.strip('{}')
                 if file_path.startswith('file:///'):
                     file_path = file_path[8:]
             
-            # Handle multiple files (just take the first one)
+            # Handle multiple files (use first one)
             if " " in file_path and os.path.exists(file_path.split(" ")[0]):
                 file_path = file_path.split(" ")[0]
             
             # Check if it's an image file
             if self.is_valid_image_file(file_path):
                 self.load_image(file_path)
+                self.log(f"Dropped image loaded: {os.path.basename(file_path)}", level="info")
             else:
-                self.log(f"Not a valid image file: {file_path}. Please select a PNG, JPEG, or JPG.", level="error")
+                self.log(f"Not a valid image file: {file_path}", level="error")
         except Exception as e:
-            self.log(f"Error in drop handling: {str(e)}", level="error")
-            import traceback
-            traceback.print_exc()
+            self.log(f"Error processing dropped file: {str(e)}", level="error")
     
     def on_canvas_click(self, event):
         self.browse_file()

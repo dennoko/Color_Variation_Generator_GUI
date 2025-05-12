@@ -53,9 +53,22 @@ class ColorVariationGenerator:
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Left panel: Control Panel
+        # Left panel: Control Panel with scrolling
         self.control_frame = ctk.CTkFrame(self.main_frame)
         self.control_frame.pack(side="left", fill="y", padx=(0, 10))
+        
+        # Create scrollable area for controls
+        self.control_canvas = ctk.CTkCanvas(self.control_frame, bg="#2b2b2b", highlightthickness=0)
+        self.control_scrollbar = ctk.CTkScrollbar(self.control_frame, orientation="vertical", command=self.control_canvas.yview)
+        
+        # Configure canvas scrolling
+        self.control_canvas.configure(yscrollcommand=self.control_scrollbar.set)
+        self.control_canvas.pack(side="left", fill="both", expand=True)
+        self.control_scrollbar.pack(side="right", fill="y")
+        
+        # Frame inside canvas to hold controls
+        self.scrollable_control_frame = ctk.CTkFrame(self.control_canvas, fg_color="transparent")
+        self.scrollable_control_window = self.control_canvas.create_window((0, 0), window=self.scrollable_control_frame, anchor="nw")
         
         # Right panel: Preview and Output
         self.right_frame = ctk.CTkFrame(self.main_frame)
@@ -78,13 +91,43 @@ class ColorVariationGenerator:
         # Create log area
         self.create_log_area()
         
+        # Configure scroll region when controls are updated
+        self.scrollable_control_frame.bind("<Configure>", self.on_controls_configure)
+        self.control_canvas.bind("<Configure>", self.on_canvas_configure)
+        
+        # Mouse wheel scrolling
+        self.scrollable_control_frame.bind("<MouseWheel>", self.on_mousewheel)  # Windows
+        self.scrollable_control_frame.bind("<Button-4>", self.on_mousewheel)    # Linux scroll up
+        self.scrollable_control_frame.bind("<Button-5>", self.on_mousewheel)    # Linux scroll down
+
+    def on_controls_configure(self, event):
+        """Update scroll region when the control frame changes size"""
+        self.control_canvas.configure(scrollregion=self.control_canvas.bbox("all"))
+
+    def on_canvas_configure(self, event):
+        """Update the width of the window object when canvas changes size"""
+        canvas_width = event.width
+        self.control_canvas.itemconfig(self.scrollable_control_window, width=canvas_width)
+
+    def on_mousewheel(self, event):
+        """Handle mouse wheel scrolling"""
+        if sys.platform == 'win32':
+            self.control_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        elif sys.platform == 'darwin':  # macOS
+            self.control_canvas.yview_scroll(int(-1 * event.delta), "units")
+        else:  # Linux
+            if event.num == 4:
+                self.control_canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self.control_canvas.yview_scroll(1, "units")
+        
     def create_control_panel(self):
         # Control panel title
-        self.control_title = ctk.CTkLabel(self.control_frame, text="Control Panel", font=("Arial", 16, "bold"))
+        self.control_title = ctk.CTkLabel(self.scrollable_control_frame, text="Control Panel", font=("Arial", 16, "bold"))
         self.control_title.pack(pady=(10, 20))
         
         # Image selection
-        self.file_frame = ctk.CTkFrame(self.control_frame)
+        self.file_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.file_frame.pack(fill="x", padx=10, pady=5)
         
         self.file_label = ctk.CTkLabel(self.file_frame, text="Input Image:")
@@ -97,11 +140,11 @@ class ColorVariationGenerator:
         self.file_button.pack(fill="x", pady=5)
         
         # Separator
-        self.separator1 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator1 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator1.pack(fill="x", padx=10, pady=10)
         
         # Variation parameters
-        self.param_frame = ctk.CTkFrame(self.control_frame)
+        self.param_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.param_frame.pack(fill="x", padx=10, pady=5)
         
         self.saturation_label = ctk.CTkLabel(self.param_frame, text="Saturation Levels:")
@@ -119,11 +162,11 @@ class ColorVariationGenerator:
         self.hue_entry.pack(fill="x", pady=5)
         
         # Separator
-        self.separator2 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator2 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator2.pack(fill="x", padx=10, pady=10)
         
         # RGB Adjustment
-        self.rgb_frame = ctk.CTkFrame(self.control_frame)
+        self.rgb_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.rgb_frame.pack(fill="x", padx=10, pady=5)
         
         self.rgb_label = ctk.CTkLabel(self.rgb_frame, text="RGB Adjustment for Low Saturation:")
@@ -160,11 +203,11 @@ class ColorVariationGenerator:
         self.blue_slider.pack(fill="x", pady=5)
         
         # Separator
-        self.separator3 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator3 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator3.pack(fill="x", padx=10, pady=10)
         
         # Grayscale-Skip options
-        self.grayscale_frame = ctk.CTkFrame(self.control_frame)
+        self.grayscale_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.grayscale_frame.pack(fill="x", padx=10, pady=5)
         
         self.grayscale_label = ctk.CTkLabel(self.grayscale_frame, text="Grayscale-Skip Modes:")
@@ -199,11 +242,11 @@ class ColorVariationGenerator:
         self.threshold_value.trace_add("write", self.update_threshold_display)
         
         # Separator
-        self.separator4 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator4 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator4.pack(fill="x", padx=10, pady=10)
         
         # Transparency options
-        self.transparency_frame = ctk.CTkFrame(self.control_frame)
+        self.transparency_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.transparency_frame.pack(fill="x", padx=10, pady=5)
         
         self.transparency_label = ctk.CTkLabel(self.transparency_frame, text="Transparency Processing:")
@@ -224,11 +267,11 @@ class ColorVariationGenerator:
         self.non_transparent_radio.pack(anchor="w", pady=2)
         
         # Separator
-        self.separator5 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator5 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator5.pack(fill="x", padx=10, pady=10)
         
         # Output options
-        self.output_frame = ctk.CTkFrame(self.control_frame)
+        self.output_frame = ctk.CTkFrame(self.scrollable_control_frame)
         self.output_frame.pack(fill="x", padx=10, pady=5)
         
         self.output_label = ctk.CTkLabel(self.output_frame, text="Output Settings:")
@@ -254,17 +297,17 @@ class ColorVariationGenerator:
         self.prefix_entry.pack(fill="x", pady=5)
         
         # Separator
-        self.separator6 = ctk.CTkFrame(self.control_frame, height=2, fg_color="gray30")
+        self.separator6 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator6.pack(fill="x", padx=10, pady=10)
         
         # Process button
-        self.process_button = ctk.CTkButton(self.control_frame, text="Start Processing", 
+        self.process_button = ctk.CTkButton(self.scrollable_control_frame, text="Start Processing", 
                                            command=self.start_processing, fg_color="green", 
                                            hover_color="dark green", height=40)
         self.process_button.pack(fill="x", padx=10, pady=10)
         
         # Cancel button (initially disabled)
-        self.cancel_button = ctk.CTkButton(self.control_frame, text="Cancel", 
+        self.cancel_button = ctk.CTkButton(self.scrollable_control_frame, text="Cancel", 
                                           command=self.cancel_processing, fg_color="red", 
                                           hover_color="dark red", state="disabled")
         self.cancel_button.pack(fill="x", padx=10, pady=5)

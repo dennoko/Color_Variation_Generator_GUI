@@ -1133,6 +1133,27 @@ class ColorVariationGenerator:
         # Close the window
         self.root.destroy()
 
+    def save_cv_image(self, cv_image, path):
+        """Save an OpenCV image to a file using PIL to support non-ASCII paths."""
+        try:
+            # Convert from BGR(A) to RGB(A)
+            if len(cv_image.shape) == 3 and cv_image.shape[2] == 4:
+                # BGRA -> RGBA
+                pil_image = Image.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGRA2RGBA))
+            elif len(cv_image.shape) == 3 and cv_image.shape[2] == 3:
+                # BGR -> RGB
+                pil_image = Image.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
+            else:
+                # Grayscale
+                pil_image = Image.fromarray(cv_image)
+            
+            # Save using PIL
+            pil_image.save(path, format='PNG')
+            return True
+        except Exception as e:
+            self.log(f"Error saving image: {e}", level="error")
+            return False
+
 def main():
     # TkinterDnDを使用したルートウィンドウの作成
     if has_dnd:

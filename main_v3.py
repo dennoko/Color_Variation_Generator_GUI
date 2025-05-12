@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Union
 import shutil
+import tkinter as tk
 
 # Set the appearance mode and color theme
 ctk.set_appearance_mode("dark")
@@ -42,11 +43,11 @@ class ColorVariationGenerator:
         # Create the main layout
         self.create_layout()
         
-        # Set up drag and drop
-        self.setup_drag_drop()
-        
         # Add a window resize event handler for responsive UI
         self.root.bind("<Configure>", self.on_window_resize)
+        
+        # Set up drag and drop after layout is created
+        self.setup_drag_drop()
         
     def create_layout(self):
         # Create main frames
@@ -153,6 +154,7 @@ class ColorVariationGenerator:
         self.saturation_value = ctk.IntVar(value=self.config.get("saturation_levels", 3))
         self.saturation_entry = ctk.CTkEntry(self.param_frame, textvariable=self.saturation_value)
         self.saturation_entry.pack(fill="x", pady=5)
+        self.saturation_value.trace_add("write", lambda *args: self.update_preview())
         
         self.hue_label = ctk.CTkLabel(self.param_frame, text="Hue Variations:")
         self.hue_label.pack(anchor="w", pady=(5, 0))
@@ -161,89 +163,16 @@ class ColorVariationGenerator:
         self.hue_entry = ctk.CTkEntry(self.param_frame, textvariable=self.hue_value)
         self.hue_entry.pack(fill="x", pady=5)
         
-        # Separator
-        self.separator2 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
-        self.separator2.pack(fill="x", padx=10, pady=10)
-        
-        # RGB Adjustment
-        self.rgb_frame = ctk.CTkFrame(self.scrollable_control_frame)
-        self.rgb_frame.pack(fill="x", padx=10, pady=5)
-        
-        self.rgb_label = ctk.CTkLabel(self.rgb_frame, text="RGB Adjustment for Low Saturation:")
-        self.rgb_label.pack(anchor="w", pady=(5, 0))
-        
-        # Red channel slider
-        self.red_label = ctk.CTkLabel(self.rgb_frame, text=f"R: {self.config.get('red_value', 100)}%")
-        self.red_label.pack(anchor="w", pady=(5, 0))
-        
-        self.red_value = ctk.DoubleVar(value=self.config.get("red_value", 100))
-        self.red_slider = ctk.CTkSlider(self.rgb_frame, from_=0, to=200, 
-                                        variable=self.red_value, 
-                                        command=lambda val: self.update_rgb_label('red', val))
-        self.red_slider.pack(fill="x", pady=5)
-        
-        # Green channel slider
-        self.green_label = ctk.CTkLabel(self.rgb_frame, text=f"G: {self.config.get('green_value', 100)}%")
-        self.green_label.pack(anchor="w", pady=(5, 0))
-        
-        self.green_value = ctk.DoubleVar(value=self.config.get("green_value", 100))
-        self.green_slider = ctk.CTkSlider(self.rgb_frame, from_=0, to=200, 
-                                          variable=self.green_value, 
-                                          command=lambda val: self.update_rgb_label('green', val))
-        self.green_slider.pack(fill="x", pady=5)
-        
-        # Blue channel slider
-        self.blue_label = ctk.CTkLabel(self.rgb_frame, text=f"B: {self.config.get('blue_value', 100)}%")
-        self.blue_label.pack(anchor="w", pady=(5, 0))
-        
-        self.blue_value = ctk.DoubleVar(value=self.config.get("blue_value", 100))
-        self.blue_slider = ctk.CTkSlider(self.rgb_frame, from_=0, to=200, 
-                                         variable=self.blue_value, 
-                                         command=lambda val: self.update_rgb_label('blue', val))
-        self.blue_slider.pack(fill="x", pady=5)
+        # For backward compatibility, keep these variables but hide from UI
+        self.red_value = ctk.DoubleVar(value=100)
+        self.green_value = ctk.DoubleVar(value=100)
+        self.blue_value = ctk.DoubleVar(value=100)
+        self.grayscale_mode = ctk.IntVar(value=0)
+        self.threshold_value = ctk.IntVar(value=10)
         
         # Separator
         self.separator3 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
         self.separator3.pack(fill="x", padx=10, pady=10)
-        
-        # Grayscale-Skip options
-        self.grayscale_frame = ctk.CTkFrame(self.scrollable_control_frame)
-        self.grayscale_frame.pack(fill="x", padx=10, pady=5)
-        
-        self.grayscale_label = ctk.CTkLabel(self.grayscale_frame, text="Grayscale-Skip Modes:")
-        self.grayscale_label.pack(anchor="w", pady=(5, 0))
-        
-        self.grayscale_mode = ctk.IntVar(value=self.config.get("grayscale_mode", 0))
-        
-        self.no_skip_radio = ctk.CTkRadioButton(self.grayscale_frame, text="No Skip", 
-                                               variable=self.grayscale_mode, value=0)
-        self.no_skip_radio.pack(anchor="w", pady=2)
-        
-        self.exact_skip_radio = ctk.CTkRadioButton(self.grayscale_frame, text="Exact Grayscale Skip", 
-                                                  variable=self.grayscale_mode, value=1)
-        self.exact_skip_radio.pack(anchor="w", pady=2)
-        
-        self.near_skip_radio = ctk.CTkRadioButton(self.grayscale_frame, text="Near Grayscale Skip", 
-                                                 variable=self.grayscale_mode, value=2)
-        self.near_skip_radio.pack(anchor="w", pady=2)
-        
-        self.threshold_label = ctk.CTkLabel(self.grayscale_frame, text="Threshold:")
-        self.threshold_label.pack(anchor="w", pady=(5, 0))
-        
-        self.threshold_value = ctk.IntVar(value=self.config.get("threshold", 10))
-        self.threshold_slider = ctk.CTkSlider(self.grayscale_frame, from_=0, to=50, 
-                                             variable=self.threshold_value)
-        self.threshold_slider.pack(fill="x", pady=5)
-        
-        self.threshold_display = ctk.CTkLabel(self.grayscale_frame, 
-                                             text=f"Threshold Value: {self.threshold_value.get()}")
-        self.threshold_display.pack(anchor="w", pady=(0, 5))
-        
-        self.threshold_value.trace_add("write", self.update_threshold_display)
-        
-        # Separator
-        self.separator4 = ctk.CTkFrame(self.scrollable_control_frame, height=2, fg_color="gray30")
-        self.separator4.pack(fill="x", padx=10, pady=10)
         
         # Transparency options
         self.transparency_frame = ctk.CTkFrame(self.scrollable_control_frame)
@@ -317,18 +246,22 @@ class ColorVariationGenerator:
         self.preview_title = ctk.CTkLabel(self.preview_frame, text="Image Preview", font=("Arial", 16, "bold"))
         self.preview_title.pack(pady=10)
         
-        # Preview canvas
+        # Preview canvas - 標準のtkinter Canvasを使用
         self.preview_canvas_frame = ctk.CTkFrame(self.preview_frame)
         self.preview_canvas_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        self.preview_canvas = ctk.CTkCanvas(self.preview_canvas_frame, background="#2b2b2b", 
-                                          highlightthickness=0)
+        # tkinterの標準Canvasを使用
+        self.preview_canvas = tk.Canvas(self.preview_canvas_frame, background="#2b2b2b", 
+                                        highlightthickness=0)
         self.preview_canvas.pack(fill="both", expand=True)
         
+        # ファイル選択用のクリックイベントの追加
+        self.preview_canvas.bind("<ButtonPress-1>", self.on_canvas_click)
+        
         # Placeholder text for empty canvas
-        self.preview_canvas.create_text(150, 150, text="Drag and drop an image here\nor click Browse", 
-                                       fill="white", font=("Arial", 14))
-    
+        self.preview_canvas.create_text(150, 150, text="Click here to browse for an image", 
+                                        fill="white", font=("Arial", 14))
+
     def create_log_area(self):
         # Log area title
         self.log_title = ctk.CTkLabel(self.log_frame, text="Processing Log", font=("Arial", 14, "bold"))
@@ -350,52 +283,35 @@ class ColorVariationGenerator:
         self.progress_label.pack(anchor="w", pady=(0, 5))
         
     def setup_drag_drop(self):
-        try:
-            # Detect platform
-            if sys.platform == 'win32':
-                # Windows drag and drop using TkDND
-                # First try if tkinterdnd2 is installed
-                try:
-                    from tkinterdnd2 import TkinterDnD, DND_FILES
-                    # Make the root compatible with tkinterdnd2
-                    self.root = TkinterDnD.Tk(className='ColorVariationGenerator')
-                    self.preview_canvas.drop_target_register(DND_FILES)
-                    self.preview_canvas.dnd_bind('<<Drop>>', self.on_drop)
-                except ImportError:
-                    self.log("TkinterDnD not available. Drag and drop disabled.", level="warning")
-                    
-            elif sys.platform == 'darwin':
-                # macOS drag and drop
-                self.preview_canvas.bind("<Button-1>", self.on_canvas_click)
-                
-            elif sys.platform.startswith('linux'):
-                # Linux drag and drop
-                try:
-                    from tkinterdnd2 import TkinterDnD, DND_FILES
-                    # Make the root compatible with tkinterdnd2
-                    self.root = TkinterDnD.Tk(className='ColorVariationGenerator')
-                    self.preview_canvas.drop_target_register(DND_FILES)
-                    self.preview_canvas.dnd_bind('<<Drop>>', self.on_drop)
-                except ImportError:
-                    self.log("TkinterDnD not available. Drag and drop disabled.", level="warning")
-        except Exception as e:
-            self.log(f"Error setting up drag and drop: {e}", level="error")
+        """Setup simplified file selection."""
+        # 画像選択のためのクリックイベントはcreate_preview_areaで設定済み
+        self.log("プレビューエリアをクリックしてファイルを選択できます", level="info")
 
     def on_drop(self, event):
-        file_path = event.data
-        
-        # Handle file path based on OS
-        if sys.platform == 'win32':
-            # Windows paths might be enclosed in {} or have file:/// prefix
-            file_path = file_path.strip('{}')
-            if file_path.startswith('file:///'):
-                file_path = file_path[8:]
-        
-        # Check if it's an image file
-        if self.is_valid_image_file(file_path):
-            self.load_image(file_path)
-        else:
-            self.log("Not a valid image file. Please select a PNG, JPEG, or JPG.", level="error")
+        """Handle dropped files."""
+        try:
+            file_path = event.data
+            
+            # Handle file path based on OS
+            if sys.platform == 'win32':
+                # Windows paths might be enclosed in {} or have file:/// prefix
+                file_path = file_path.strip('{}')
+                if file_path.startswith('file:///'):
+                    file_path = file_path[8:]
+            
+            # Handle multiple files (just take the first one)
+            if " " in file_path and os.path.exists(file_path.split(" ")[0]):
+                file_path = file_path.split(" ")[0]
+            
+            # Check if it's an image file
+            if self.is_valid_image_file(file_path):
+                self.load_image(file_path)
+            else:
+                self.log(f"Not a valid image file: {file_path}. Please select a PNG, JPEG, or JPG.", level="error")
+        except Exception as e:
+            self.log(f"Error in drop handling: {str(e)}", level="error")
+            import traceback
+            traceback.print_exc()
     
     def on_canvas_click(self, event):
         self.browse_file()
@@ -486,24 +402,45 @@ class ColorVariationGenerator:
         # Create a copy of the image for preview
         self.preview_image = self.input_image.copy()
         
-        # Apply RGB adjustments if needed (for preview only)
-        red_factor = self.red_value.get() / 100.0
-        green_factor = self.green_value.get() / 100.0
-        blue_factor = self.blue_value.get() / 100.0
+        # Apply simple saturation adjustment for preview
+        sat_factor = self.saturation_value.get() / 3.0  # Use saturation levels as factor
         
-        if red_factor != 1.0 or green_factor != 1.0 or blue_factor != 1.0:
-            # Convert to numpy array for faster processing
-            img_array = np.array(self.preview_image)
-            
-            # Apply RGB adjustments based on mode
-            if len(img_array.shape) == 3:  # Color image
-                if img_array.shape[2] >= 3:  # RGB or RGBA
-                    img_array[..., 0] = np.clip(img_array[..., 0] * red_factor, 0, 255).astype(np.uint8)
-                    img_array[..., 1] = np.clip(img_array[..., 1] * green_factor, 0, 255).astype(np.uint8)
-                    img_array[..., 2] = np.clip(img_array[..., 2] * blue_factor, 0, 255).astype(np.uint8)
-                    
-            # Convert back to PIL Image
-            self.preview_image = Image.fromarray(img_array)
+        # Convert to numpy array for processing
+        img_array = np.array(self.preview_image)
+        
+        # Process based on image type
+        if len(img_array.shape) == 3:  # Color image
+            # Convert to HSV for saturation adjustment
+            if img_array.shape[2] >= 3:  # RGB or RGBA
+                # For RGBA images, preserve alpha channel
+                has_alpha = img_array.shape[2] == 4
+                
+                if has_alpha:
+                    # Save alpha channel
+                    alpha = img_array[:, :, 3]
+                    # Convert RGB to HSV
+                    hsv_img = cv2.cvtColor(img_array[:, :, :3], cv2.COLOR_RGB2HSV)
+                else:
+                    # Convert RGB to HSV
+                    hsv_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2HSV)
+                
+                # Adjust saturation
+                hsv_img[:, :, 1] = np.clip(hsv_img[:, :, 1] * sat_factor, 0, 255).astype(np.uint8)
+                
+                # Convert back to RGB
+                rgb_img = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
+                
+                if has_alpha:
+                    # Combine adjusted RGB with original alpha
+                    final_img = np.zeros_like(img_array)
+                    final_img[:, :, :3] = rgb_img
+                    final_img[:, :, 3] = alpha
+                    img_array = final_img
+                else:
+                    img_array = rgb_img
+        
+        # Convert back to PIL Image
+        self.preview_image = Image.fromarray(img_array)
         
         # Resize for display
         display_img = self.preview_image.resize((new_width, new_height), Image.LANCZOS)
@@ -696,6 +633,7 @@ class ColorVariationGenerator:
                 dir_index += 1
                 output_path = f"{original_output_path}_{dir_index}"
             
+            # 日本語パス対応：ディレクトリ作成
             os.makedirs(output_path, exist_ok=True)
             self.log(f"Created output directory: {output_path}", level="info")
             
@@ -773,14 +711,16 @@ class ColorVariationGenerator:
                     variation_filename = f"{base_filename}_{prefix}_{variations_created:02d}.png"
                     variation_path = os.path.join(output_path, variation_filename)
                     
-                    cv2.imwrite(variation_path, variation)
+                    # 日本語パス対応：cv2.imwriteの代わりにPIL保存を使用
+                    self.save_cv_image(variation, variation_path)
                     self.log(f"Saved variation {variations_created}/{total_variations}: {variation_filename}", level="info")
                     
                     # Create and save thumbnail
                     thumbnail = self.create_thumbnail(variation)
                     thumbnail_filename = f"thumb_{variations_created:02d}.png"
                     thumbnail_path = os.path.join(thumbnails_dir, thumbnail_filename)
-                    cv2.imwrite(thumbnail_path, thumbnail)
+                    # 日本語パス対応：サムネイル保存
+                    self.save_cv_image(thumbnail, thumbnail_path)
                     thumbnail_paths.append((thumbnail_path, variation_path))
             
             # Processing completed
@@ -806,7 +746,7 @@ class ColorVariationGenerator:
     
     def process_rgb_image(self, img, hue_shift, sat_factor, r_factor, g_factor, b_factor, 
                          grayscale_mode, threshold):
-        """Process an RGB image to create a variation."""
+        """Process an RGB image to create a variation with simplified saturation."""
         # Convert to HSV for easier manipulation of hue and saturation
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.float32)
         
@@ -816,26 +756,8 @@ class ColorVariationGenerator:
         # Shift hue (H is in range [0, 180] in OpenCV)
         h = np.mod(h + hue_shift / 2, 180).astype(np.float32)
         
-        # Adjust saturation
+        # Adjust saturation - simple adjustment without RGB tweaking
         s = np.clip(s * sat_factor, 0, 255).astype(np.float32)
-        
-        # Handle grayscale pixels
-        if grayscale_mode > 0:
-            # Get original BGR channels
-            b, g, r = cv2.split(img)
-            
-            if grayscale_mode == 1:  # Exact grayscale
-                # Create a mask where R=G=B
-                grayscale_mask = (r == g) & (g == b)
-            else:  # Near grayscale
-                # Create a mask where max(R,G,B) - min(R,G,B) < threshold
-                min_rgb = np.minimum(np.minimum(r, g), b)
-                max_rgb = np.maximum(np.maximum(r, g), b)
-                grayscale_mask = (max_rgb - min_rgb) < threshold
-            
-            # Apply mask - don't change hue and saturation for grayscale pixels
-            h = np.where(grayscale_mask, h, h)
-            s = np.where(grayscale_mask, 0, s)  # Set saturation to 0 for grayscale pixels
         
         # Merge channels back
         hsv = cv2.merge([h, s, v])
@@ -843,19 +765,11 @@ class ColorVariationGenerator:
         # Convert back to BGR
         result = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
         
-        # Apply RGB adjustments if saturation is low
-        if sat_factor < 0.5:
-            b, g, r = cv2.split(result)
-            r = np.clip(r * r_factor, 0, 255).astype(np.uint8)
-            g = np.clip(g * g_factor, 0, 255).astype(np.uint8)
-            b = np.clip(b * b_factor, 0, 255).astype(np.uint8)
-            result = cv2.merge([b, g, r])
-        
         return result
-    
+
     def process_rgba_image(self, img, hue_shift, sat_factor, r_factor, g_factor, b_factor, 
                           grayscale_mode, threshold, transparency_mode):
-        """Process an RGBA image to create a variation."""
+        """Process an RGBA image to create a variation with simplified saturation."""
         # Split the image into BGR and Alpha channels
         bgr = img[:, :, :3]
         alpha = img[:, :, 3]
@@ -871,9 +785,10 @@ class ColorVariationGenerator:
             # Only process non-transparent pixels
             process_mask = alpha == 255
         
-        # Process the BGR channels
+        # Process the BGR channels - simplified to just use hue and saturation
+        # Without RGB adjustments or grayscale skip logic
         processed_bgr = self.process_rgb_image(
-            bgr, hue_shift, sat_factor, r_factor, g_factor, b_factor, grayscale_mode, threshold
+            bgr, hue_shift, sat_factor, 1.0, 1.0, 1.0, 0, 0
         )
         
         # Create the final result by combining original and processed

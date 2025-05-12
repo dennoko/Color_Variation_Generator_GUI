@@ -30,9 +30,8 @@ class ColorVariationGenerator:
     def __init__(self, root):
         self.root = root
         
-        # Initialize TkinterDnD if available
-        if has_dnd and not isinstance(self.root, tkinterdnd2.TkinterDnD.Tk):
-            self.root = tkinterdnd2.TkinterDnD.Tk.call('tk', 'windowingsystem') == 'win32' and tkinterdnd2.DnDWrapper(self.root).TkdndVersion > '2.9.2'
+        # ドラッグ＆ドロップのサポートをチェック
+        self.has_dnd_support = has_dnd and hasattr(self.root, 'drop_target_register')
         
         self.root.title("Color Variation Generator")
         self.root.geometry("1200x800")
@@ -296,13 +295,23 @@ class ColorVariationGenerator:
         self.progress_label.pack(anchor="w", pady=(0, 5))
         
     def setup_drag_drop(self):
-        """Setup simplified drag and drop with paste functionality."""
+        """Setup drag and drop for image selection."""
         self.log("プレビューエリアにファイルをドラッグ＆ドロップするか、クリックしてファイルを選択できます", level="info")
         
-        # Bind keyboard events for paste
+        # クリップボードイベントのバインド
         self.root.bind("<Control-v>", self.on_paste)
         
-        # Create visual indicator for drag
+        if self.has_dnd_support:
+            try:
+                # Windows 11向けのドラッグアンドドロップ設定
+                self.preview_canvas.drop_target_register(DND_FILES)
+                self.preview_canvas.dnd_bind('<<Drop>>', self.on_drop)
+                self.log("ドラッグ＆ドロップサポートが有効になりました", level="info")
+            except Exception as e:
+                self.log(f"ドラッグ＆ドロップの設定中にエラーが発生しました: {e}", level="error")
+                self.has_dnd_support = False
+        
+        # ドラッグオーバー時の視覚的フィードバック
         self.preview_canvas.bind("<Enter>", lambda e: self.update_canvas_style(True))
         self.preview_canvas.bind("<Leave>", lambda e: self.update_canvas_style(False))
 
@@ -345,27 +354,43 @@ class ColorVariationGenerator:
     def on_drop(self, event):
         """Handle dropped files."""
         try:
-            # Get the dropped file path
+            # ドロップされたファイルパスを取得
             file_path = event.data
             
-            # Handle Windows paths (may have curly braces or file:/// prefix)
+            # Windowsパスの処理 (中括弧、ファイルURLプレフィックスの削除)
             if sys.platform == 'win32':
-                file_path = file_path.strip('{}')
+                # 中括弧を削除
+                if file_path.startswith('{') and file_path.endswith('}'):
+                    file_path = file_path[1:-1]
+                
+                # file:/// プレフィックスを削除
                 if file_path.startswith('file:///'):
                     file_path = file_path[8:]
+                    
+                # URLエンコードの処理
+                file_path = file_path.replace('%20', ' ')
             
-            # Handle multiple files (use first one)
-            if " " in file_path and os.path.exists(file_path.split(" ")[0]):
-                file_path = file_path.split(" ")[0]
+            # 複数ファイルがドロップされた場合は最初のファイルを使用
+            if ' ' in file_path:
+                possible_paths = file_path.split(' ')
+                for path in possible_paths:
+                    if os.path.exists(path) and self.is_valid_image_file(path):
+                        file_path = path
+                        break
             
-            # Check if it's an image file
-            if self.is_valid_image_file(file_path):
+            # ファイルパスを正規化
+            file_path = os.path.normpath(file_path)
+            
+            # 有効な画像ファイルかチェック
+            if os.path.exists(file_path) and self.is_valid_image_file(file_path):
                 self.load_image(file_path)
-                self.log(f"Dropped image loaded: {os.path.basename(file_path)}", level="info")
+                self.log(f"ドロップされた画像を読み込みました: {os.path.basename(file_path)}", level="info")
             else:
-                self.log(f"Not a valid image file: {file_path}", level="error")
+                self.log(f"有効な画像ファイルではありません: {file_path}", level="error")
         except Exception as e:
-            self.log(f"Error processing dropped file: {str(e)}", level="error")
+            self.log(f"ドロップされたファイルの処理中にエラーが発生しました: {str(e)}", level="error")
+            import traceback
+            traceback.print_exc()
     
     def on_canvas_click(self, event):
         self.browse_file()
@@ -400,27 +425,34 @@ class ColorVariationGenerator:
             self.input_image_path = file_path
             self.file_path.configure(text=os.path.basename(file_path))
             
-            # Load with PIL
+            # PILで読み込み
             self.input_image = Image.open(file_path)
             
-            # Convert to OpenCV format
-            if self.input_image.mode == 'RGBA':
-                self.cv_image = cv2.cvtColor(np.array(self.input_image), cv2.COLOR_RGBA2BGRA)
-            else:
-                self.cv_image = cv2.cvtColor(np.array(self.input_image), cv2.COLOR_RGB2BGR)
+            # OpenCV形式に変換
+            try:
+                if self.input_image.mode == 'RGBA':
+                    self.cv_image = cv2.cvtColor(np.array(self.input_image), cv2.COLOR_RGBA2BGRA)
+                else:
+                    self.cv_image = cv2.cvtColor(np.array(self.input_image), cv2.COLOR_RGB2BGR)
+            except Exception as cv_error:
+                self.log(f"OpenCV変換エラー: {cv_error} - 処理は続行します", level="warning")
+                # エラーが発生しても処理を継続
             
-            # Update preview
+            # プレビューの更新
             self.update_preview()
             
-            # Update output directory path if not explicitly set
+            # 出力ディレクトリの更新
             if not self.output_dir_var.get():
-                self.output_dir_var.set(os.path.dirname(file_path))
-                self.output_dir_path.configure(text=os.path.dirname(file_path))
+                output_dir = os.path.dirname(file_path)
+                self.output_dir_var.set(output_dir)
+                self.output_dir_path.configure(text=output_dir)
             
-            self.log(f"Loaded image: {os.path.basename(file_path)}", level="info")
+            self.log(f"画像を読み込みました: {os.path.basename(file_path)}", level="info")
             
         except Exception as e:
-            self.log(f"Error loading image: {e}", level="error")
+            self.log(f"画像の読み込み中にエラーが発生しました: {e}", level="error")
+            import traceback
+            traceback.print_exc()
     
     def update_preview(self):
         """Update the preview canvas with the current image."""
@@ -1102,13 +1134,21 @@ class ColorVariationGenerator:
         self.root.destroy()
 
 def main():
-    # Create the Tkinter root window
-    root = ctk.CTk()
+    # TkinterDnDを使用したルートウィンドウの作成
+    if has_dnd:
+        # TkinterDnDのルートウィンドウを作成
+        root = tkinterdnd2.TkinterDnD.Tk()
+        # customtkinterのテーマを適用
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue") 
+    else:
+        # 通常のカスタムtkinterルートを使用
+        root = ctk.CTk()
     
-    # Create the application
+    # アプリケーションの作成
     app = ColorVariationGenerator(root)
     
-    # Start the main event loop
+    # メインイベントループの開始
     root.mainloop()
 
 if __name__ == "__main__":

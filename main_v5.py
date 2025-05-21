@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import sys
 
 # Set appearance mode and default color theme
 ctk.set_appearance_mode("System")
@@ -294,9 +295,23 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
         
+        # ウィンドウアイコンを設定
+        icon_path = "app_icon.ico"
+        
+        # PyInstallerでパッケージ化した場合のリソースパス対応
+        if getattr(sys, 'frozen', False):
+            # 実行ファイルの場所を基準にアイコンパスを設定
+            base_path = sys._MEIPASS
+            icon_path = os.path.join(base_path, "app_icon.ico")
+        
+        # アイコンファイルが存在する場合のみ設定
+        if os.path.exists(icon_path):
+            self.iconbitmap(icon_path)
+        
+        # 以下、既存のコード
         # Set up the main window
         self.title("Color Variation Generator")
-        self.geometry("1100x700")
+        self.geometry("1100x750") # Adjusted height for progress bar
         
         # Initialize variables
         self.image_path = None
@@ -309,6 +324,7 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.sat_var_count = ctk.IntVar(value=3)
         self.output_path_var = ctk.StringVar(value="Default (input directory)")
         self.rgb_adjustment_mode = ctk.StringVar(value="Additive") # Default to Additive
+        self.overwrite_var = ctk.BooleanVar(value=False)  # Default: don't overwrite (append numbers)
         
         # Format variables for display
         self.r_display = ctk.StringVar(value="1.0")
@@ -335,6 +351,39 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.r_display.set(f"{self.r_value.get():.1f}")
         self.g_display.set(f"{self.g_value.get():.1f}")
         self.b_display.set(f"{self.b_value.get():.1f}")
+
+        # Update entry fields if they exist
+        if hasattr(self, 'r_entry'):
+            self.r_entry.delete(0, "end")
+            self.r_entry.insert(0, f"{self.r_value.get():.1f}")
+        if hasattr(self, 'g_entry'):
+            self.g_entry.delete(0, "end")
+            self.g_entry.insert(0, f"{self.g_value.get():.1f}")
+        if hasattr(self, 'b_entry'):
+            self.b_entry.delete(0, "end")
+            self.b_entry.insert(0, f"{self.b_value.get():.1f}")
+
+    def update_rgb_from_entry(self, *args):
+        """Update RGB values from entry fields"""
+        try:
+            r = float(self.r_entry.get())
+            if 0.0 <= r <= 2.0:
+                self.r_value.set(r)
+        except ValueError:
+            pass # Ignore invalid input
+        try:
+            g = float(self.g_entry.get())
+            if 0.0 <= g <= 2.0:
+                self.g_value.set(g)
+        except ValueError:
+            pass # Ignore invalid input
+        try:
+            b = float(self.b_entry.get())
+            if 0.0 <= b <= 2.0:
+                self.b_value.set(b)
+        except ValueError:
+            pass # Ignore invalid input
+        self.update_preview()
     
     def create_ui(self):
         # Create main frame
@@ -343,10 +392,10 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Split into left (image preview) and right (controls) sections
         self.left_frame = ctk.CTkFrame(self.main_frame)
-        self.left_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        self.left_frame.pack(side="left", fill="both", expand=True, padx=(5,2), pady=5) # Adjusted padding
         
         self.right_frame = ctk.CTkFrame(self.main_frame)
-        self.right_frame.pack(side="right", fill="y", padx=5, pady=5, ipadx=10)
+        self.right_frame.pack(side="right", fill="y", padx=(2,5), pady=5, ipadx=5) # Adjusted padding
         
         # Image preview area
         self.preview_frame = ctk.CTkFrame(self.left_frame)
@@ -357,7 +406,7 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # RGB sliders section
         self.control_frame = ctk.CTkFrame(self.right_frame)
-        self.control_frame.pack(fill="x", padx=5, pady=5)
+        self.control_frame.pack(fill="x", padx=2, pady=5) # Adjusted padding
         
         self.rgb_label = ctk.CTkLabel(self.control_frame, text="RGB調整", font=HEADING_FONT)
         self.rgb_label.pack(pady=(5, 0))
@@ -377,51 +426,57 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.rgb_mode_selector.pack(side="left", padx=2, expand=True, fill="x")
         
-        # Red slider
+        # Red slider and entry
         self.r_frame = ctk.CTkFrame(self.control_frame)
         self.r_frame.pack(fill="x", pady=2)
         
-        self.r_label = ctk.CTkLabel(self.r_frame, text="R:", width=20, font=DEFAULT_FONT)
-        self.r_label.pack(side="left", padx=5)
+        self.r_label = ctk.CTkLabel(self.r_frame, text="R:", width=15, font=DEFAULT_FONT) # Adjusted width
+        self.r_label.pack(side="left", padx=(5,2))
         
         self.r_slider = ctk.CTkSlider(self.r_frame, from_=0.0, to=2.0, variable=self.r_value, 
                                      command=self.update_preview)
-        self.r_slider.pack(side="left", fill="x", expand=True, padx=5)
+        self.r_slider.pack(side="left", fill="x", expand=True, padx=2)
         
-        self.r_value_label = ctk.CTkLabel(self.r_frame, textvariable=self.r_display, width=40, font=DEFAULT_FONT)
-        self.r_value_label.pack(side="left", padx=5)
-        
-        # Green slider
+        self.r_entry = ctk.CTkEntry(self.r_frame, textvariable=self.r_display, width=40, font=DEFAULT_FONT)
+        self.r_entry.pack(side="left", padx=(2,5))
+        self.r_entry.bind("<Return>", self.update_rgb_from_entry)
+        self.r_entry.bind("<FocusOut>", self.update_rgb_from_entry)
+
+        # Green slider and entry
         self.g_frame = ctk.CTkFrame(self.control_frame)
         self.g_frame.pack(fill="x", pady=2)
         
-        self.g_label = ctk.CTkLabel(self.g_frame, text="G:", width=20, font=DEFAULT_FONT)
-        self.g_label.pack(side="left", padx=5)
+        self.g_label = ctk.CTkLabel(self.g_frame, text="G:", width=15, font=DEFAULT_FONT) # Adjusted width
+        self.g_label.pack(side="left", padx=(5,2))
         
         self.g_slider = ctk.CTkSlider(self.g_frame, from_=0.0, to=2.0, variable=self.g_value,
                                      command=self.update_preview)
-        self.g_slider.pack(side="left", fill="x", expand=True, padx=5)
+        self.g_slider.pack(side="left", fill="x", expand=True, padx=2)
         
-        self.g_value_label = ctk.CTkLabel(self.g_frame, textvariable=self.g_display, width=40, font=DEFAULT_FONT)
-        self.g_value_label.pack(side="left", padx=5)
-        
-        # Blue slider
+        self.g_entry = ctk.CTkEntry(self.g_frame, textvariable=self.g_display, width=40, font=DEFAULT_FONT)
+        self.g_entry.pack(side="left", padx=(2,5))
+        self.g_entry.bind("<Return>", self.update_rgb_from_entry)
+        self.g_entry.bind("<FocusOut>", self.update_rgb_from_entry)
+
+        # Blue slider and entry
         self.b_frame = ctk.CTkFrame(self.control_frame)
         self.b_frame.pack(fill="x", pady=2)
         
-        self.b_label = ctk.CTkLabel(self.b_frame, text="B:", width=20, font=DEFAULT_FONT)
-        self.b_label.pack(side="left", padx=5)
+        self.b_label = ctk.CTkLabel(self.b_frame, text="B:", width=15, font=DEFAULT_FONT) # Adjusted width
+        self.b_label.pack(side="left", padx=(5,2))
         
         self.b_slider = ctk.CTkSlider(self.b_frame, from_=0.0, to=2.0, variable=self.b_value,
                                      command=self.update_preview)
-        self.b_slider.pack(side="left", fill="x", expand=True, padx=5)
+        self.b_slider.pack(side="left", fill="x", expand=True, padx=2)
         
-        self.b_value_label = ctk.CTkLabel(self.b_frame, textvariable=self.b_display, width=40, font=DEFAULT_FONT)
-        self.b_value_label.pack(side="left", padx=5)
+        self.b_entry = ctk.CTkEntry(self.b_frame, textvariable=self.b_display, width=40, font=DEFAULT_FONT)
+        self.b_entry.pack(side="left", padx=(2,5))
+        self.b_entry.bind("<Return>", self.update_rgb_from_entry)
+        self.b_entry.bind("<FocusOut>", self.update_rgb_from_entry)
         
         # Variation settings
         self.var_frame = ctk.CTkFrame(self.right_frame)
-        self.var_frame.pack(fill="x", padx=5, pady=5)
+        self.var_frame.pack(fill="x", padx=2, pady=5) # Adjusted padding
         
         self.var_label = ctk.CTkLabel(self.var_frame, text="バリエーション設定", font=HEADING_FONT)
         self.var_label.pack(pady=(5, 0))
@@ -440,15 +495,15 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.sat_frame = ctk.CTkFrame(self.var_frame)
         self.sat_frame.pack(fill="x", pady=2)
         
-        self.sat_label = ctk.CTkLabel(self.sat_frame, text="彩度バリエーション:", width=100, font=DEFAULT_FONT)
-        self.sat_label.pack(side="left", padx=5)
+        self.sat_label = ctk.CTkLabel(self.sat_frame, text="彩度バリエーション:", width=120, font=DEFAULT_FONT) # Adjusted width
+        self.sat_label.pack(side="left", padx=(5,2))
         
         self.sat_entry = ctk.CTkEntry(self.sat_frame, textvariable=self.sat_var_count, width=50, font=DEFAULT_FONT)
-        self.sat_entry.pack(side="left", padx=5)
+        self.sat_entry.pack(side="left", padx=(2,5))
         
         # Output path settings
         self.output_frame = ctk.CTkFrame(self.right_frame)
-        self.output_frame.pack(fill="x", padx=5, pady=5)
+        self.output_frame.pack(fill="x", padx=2, pady=5) # Adjusted padding
         
         self.output_label = ctk.CTkLabel(self.output_frame, text="出力パス", font=HEADING_FONT)
         self.output_label.pack(pady=(5, 0))
@@ -458,6 +513,11 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         self.browse_button = ctk.CTkButton(self.output_frame, text="参照", command=self.browse_output, font=DEFAULT_FONT)
         self.browse_button.pack(fill="x", padx=5, pady=2)
+
+        # Add overwrite checkbox
+        self.overwrite_check = ctk.CTkCheckBox(self.output_frame, text="既存フォルダを上書きする", 
+                                      variable=self.overwrite_var, font=DEFAULT_FONT)
+        self.overwrite_check.pack(fill="x", padx=5, pady=2)
         
         # Action buttons
         self.button_frame = ctk.CTkFrame(self.right_frame)
@@ -469,7 +529,7 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.generate_button = ctk.CTkButton(self.button_frame, text="バリエーション生成", 
                                            command=self.generate_variations, state="disabled", font=DEFAULT_FONT)
         self.generate_button.pack(fill="x", padx=5, pady=2)
-        
+
         # Log area
         self.log_frame = ctk.CTkFrame(self.right_frame)
         self.log_frame.pack(fill="both", expand=True, padx=5, pady=5)
@@ -477,9 +537,35 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.log_label = ctk.CTkLabel(self.log_frame, text="ログ", font=HEADING_FONT)
         self.log_label.pack(pady=(5, 0))
         
-        self.log_text = ctk.CTkTextbox(self.log_frame, height=200, font=DEFAULT_FONT)
+        self.log_text = ctk.CTkTextbox(self.log_frame, height=150, font=DEFAULT_FONT) # Adjusted height
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # リセットボタンをログ表示の下に移動
+        self.reset_button = ctk.CTkButton(self.right_frame, text="設定をリセット", command=self.reset_settings, font=DEFAULT_FONT)
+        self.reset_button.pack(fill="x", padx=5, pady=5)
+
+        # Progress Bar
+        self.progress_bar = ctk.CTkProgressBar(self.right_frame, orientation="horizontal", mode="determinate")
+        self.progress_bar.pack(fill="x", padx=5, pady=(5,10))
+        self.progress_bar.set(0)
     
+    def reset_settings(self):
+        """Reset all settings to their default values."""
+        self.r_value.set(1.0)
+        self.g_value.set(1.0)
+        self.b_value.set(1.0)
+        self.rgb_adjustment_mode.set("Additive")
+        self.hue_var_count.set(10)
+        self.sat_var_count.set(3)
+        self.output_path_var.set("Default (input directory)")
+        self.overwrite_var.set(False)  # Reset overwrite setting to default (false)
+        if self.image_path:
+            self.update_default_output_path()
+        
+        self.update_display_values() # Update display for RGB
+        self.update_preview()
+        self.log("設定がリセットされました。")
+
     def handle_drop(self, event):
         """Handle file drop events"""
         file_path = event.data
@@ -639,20 +725,108 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
     def _generate_variations_thread(self, output_path, hue_count, sat_count):
         """Thread function to generate variations without freezing UI"""
         try:
+            self.progress_bar.set(0) # Reset progress bar
+            self.progress_bar.start() # Indeterminate mode while preparing
+
             # Get original filename without extension
             original_filename = os.path.splitext(os.path.basename(self.image_path))[0]
             
-            # Generate combined variations (all combinations)
-            self.log(f"組み合わせバリエーションを生成中 (合計 {hue_count * sat_count})...")
-            combined_variations = generate_combined_variations(self.adjusted_image, hue_count, sat_count)
-            
-            # Create subdirectories
+            # Check if we need to create a unique path
+            if not self.overwrite_var.get():
+                output_path = get_unique_folder_path(output_path)
+                
+            # Define combined variations directory path
             combined_dir = os.path.join(output_path, "combined_variations")
             
+            # Create output directories only once here
+            os.makedirs(output_path, exist_ok=True)
             os.makedirs(combined_dir, exist_ok=True)
             
+            self.log(f"組み合わせバリエーションを生成中 (合計 {hue_count * sat_count})...")
+            
+            # Temporarily switch to determinate mode for generation
+            self.progress_bar.configure(mode="determinate")
+            
+            # --- Modified generate_combined_variations to yield progress ---
+            # This requires modifying generate_combined_variations function
+            # For simplicity, we'll update progress after the whole generation here.
+            # A more granular progress would require deeper changes in generate_combined_variations.
+
+            total_variations = hue_count * sat_count
+            generated_count = 0
+
+            # --- Simulate progress within this thread for now ---
+            # In a real scenario, generate_combined_variations would need to be refactored
+            # to report progress back, or we estimate progress based on loops.
+
+            # For demonstration, let's assume generate_combined_variations is a black box
+            # and we update progress after it's done with the main generation part.
+            # A more accurate progress would involve modifying generate_combined_variations
+            # to yield progress or accept a callback.
+
+            combined_variations = []
+            has_alpha = self.adjusted_image.mode == 'RGBA'
+            image_np = np.array(self.adjusted_image)
+
+            for h_idx in range(hue_count):
+                hue = h_idx * (180 / hue_count)
+                hue_display = hue * 2
+                hue_label = f"{int(hue_display)}°"
+                
+                for s_idx in range(sat_count):
+                    saturation = (s_idx + 1) * (1 / sat_count)
+                    sat_label = f"{int(saturation * 100)}%"
+                    
+                    if has_alpha:
+                        rgb_channels = image_np[:, :, :3]
+                        alpha_channel = image_np[:, :, 3]
+                        hsv_image = cv2.cvtColor(rgb_channels, cv2.COLOR_RGB2HSV)
+                        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 180
+                        hsv_image[:, :, 1] = hsv_image[:, :, 1] * saturation
+                        rgb_result = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
+                        result = np.zeros((image_np.shape[0], image_np.shape[1], 4), dtype=np.uint8)
+                        result[:, :, :3] = rgb_result
+                        result[:, :, 3] = alpha_channel
+                        combined_variations.append({
+                            'image': Image.fromarray(result, 'RGBA'),
+                            'hue': hue_label,
+                            'saturation': sat_label
+                        })
+                    else:
+                        hsv_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2HSV)
+                        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 180
+                        hsv_image[:, :, 1] = hsv_image[:, :, 1] * saturation
+                        color_variation = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
+                        combined_variations.append({
+                            'image': Image.fromarray(color_variation),
+                            'hue': hue_label,
+                            'saturation': sat_label
+                        })
+                    generated_count += 1
+                    progress = generated_count / total_variations
+                    self.after(0, lambda p=progress: self.progress_bar.set(p)) # Update progress bar in main thread
+            # --- End of simulated progress section ---
+
+            self.log("バリエーションデータの生成完了。保存を開始します...")
+            self.progress_bar.set(0.8) # Example: 80% after generation, before saving
+            
             # Save variations with original filename
-            combined_saved = save_combined_variations(combined_variations, combined_dir, original_filename)
+            # For progress during saving, we'd iterate and update
+            num_saved = 0
+            for i, var in enumerate(combined_variations):
+                filename = f"{original_filename}_{i:03d}.png"
+                filename = filename.replace("°", "deg").replace("%", "pct")
+                if var['image'].mode == 'RGBA':
+                    var['image'].save(f"{combined_dir}/{filename}", format="PNG")
+                else:
+                    var['image'].save(f"{combined_dir}/{filename}")
+                num_saved +=1
+                # Update progress based on saved files (optional, can be slow if many small files)
+                # save_progress = num_saved / len(combined_variations)
+                # self.after(0, lambda p=0.8 + save_progress * 0.15: self.progress_bar.set(p))
+
+
+            combined_saved = len(combined_variations) # Use actual count
             
             # Save original adjusted image with transparency preserved if present
             if self.adjusted_image.mode == 'RGBA':
@@ -660,12 +834,22 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
             else:
                 self.adjusted_image.save(f"{output_path}/{original_filename}_adjusted.png")
             
+            self.progress_bar.set(1.0) # Generation and saving complete
             self.log(f"バリエーションの保存に成功しました:")
             self.log(f"- {combined_saved}個の組み合わせバリエーション: {combined_dir}")
             self.log(f"- 調整済み元画像: {output_path}")
+            
         except Exception as e:
             self.log(f"バリエーション生成エラー: {str(e)}")
-    
+            traceback.print_exc()
+            self.progress_bar.set(0) # Reset on error
+        finally:
+            # Ensure progress bar stops indeterminate animation if it was running
+            self.progress_bar.stop() 
+            # Optionally hide or reset progress bar after a delay
+            self.after(2000, lambda: self.progress_bar.set(0))
+
+
     def log(self, message):
         """Add a message to the log with timestamp"""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -679,6 +863,25 @@ class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Also print to console
         print(log_entry.strip())
+
+def get_unique_folder_path(base_path):
+    """
+    Create a unique folder path by appending incrementing numbers if needed.
+    
+    Args:
+        base_path (str): The base folder path to check
+    Returns:
+        str: A unique folder path (either the original or with a number appended)
+    """
+    if not os.path.exists(base_path):
+        return base_path
+        
+    counter = 1
+    while True:
+        new_path = f"{base_path}_{counter}"
+        if not os.path.exists(new_path):
+            return new_path
+        counter += 1
 
 # Main application entry point
 if __name__ == "__main__":

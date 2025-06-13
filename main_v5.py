@@ -33,73 +33,6 @@ def load_image(image_path):
     except Exception as e:
         raise Exception(f"Failed to load image: {str(e)}")
 
-def generate_hue_variations(image, num_variations=5):
-    """
-    Generate hue variations of an image with error handling.
-    
-    Args:
-        image (PIL.Image): The input image.
-        num_variations (int): The number of color variations to generate.
-    Returns:
-        variations (list): A list of color variations.
-    """
-    try:
-        if num_variations < 1:
-            raise ValueError("Number of variations must be at least 1")
-            
-        # Convert the image to a NumPy array
-        image_np = np.array(image)
-        variations = []
-
-        for i in range(num_variations):
-            # OpenCV uses hue range 0-179 (not 0-359), so scale appropriately
-            hue = i * (180 / num_variations)
-            
-            # Convert the image to HSV color space
-            hsv_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2HSV)
-            # Apply the hue transformation
-            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 180
-            # Convert back to RGB
-            color_variation = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
-            variations.append(Image.fromarray(color_variation))
-            
-        return variations
-    except Exception as e:
-        raise Exception(f"Failed to generate hue variations: {str(e)}")
-
-def generate_saturation_variations(image, num_variations=5):
-    """
-    Generate saturation variations of an image with error handling.
-    
-    Args:
-        image (PIL.Image): The input image.
-        num_variations (int): The number of saturation variations to generate.
-    Returns:
-        variations (list): A list of saturation variations.
-    """
-    try:
-        if num_variations < 1:
-            raise ValueError("Number of variations must be at least 1")
-            
-        # Convert the image to a NumPy array
-        image_np = np.array(image)
-        variations = []
-
-        for i in range(num_variations):
-            saturation = (i + 1) * (1 / num_variations)
-            
-            # Convert the image to HSV color space
-            hsv_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2HSV)
-            # Apply the saturation transformation
-            hsv_image[:, :, 1] = hsv_image[:, :, 1] * saturation
-            # Convert back to RGB
-            color_variation = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
-            variations.append(Image.fromarray(color_variation))
-            
-        return variations
-    except Exception as e:
-        raise Exception(f"Failed to generate saturation variations: {str(e)}")
-
 def generate_combined_variations(image, hue_variations=5, sat_variations=5):
     """
     Generate all combinations of hue and saturation variations.
@@ -180,8 +113,7 @@ def generate_combined_variations(image, hue_variations=5, sat_variations=5):
         raise Exception(f"Failed to generate combined variations: {str(e)}")
 
 def adjust_image_rgb(image, r_strength=1.0, g_strength=1.0, b_strength=1.0, mode="additive"):
-    """
-    Adjust the RGB channels of an image using a specified method.
+    """B channels of an image using a specified method.
     Preserves transparency for images with alpha channel.
     Strength values from 0.0 to 2.0.
     Mode can be "additive" or "multiplicative".
@@ -244,51 +176,6 @@ def adjust_image_rgb(image, r_strength=1.0, g_strength=1.0, b_strength=1.0, mode
         # import traceback # Uncomment for detailed debugging
         # traceback.print_exc() # Uncomment for detailed debugging
         raise Exception(f"Failed to adjust image: {str(e)}")
-
-def save_images(images, output_path, original_filename, prefix="variation"):
-    """
-    Save images to a given path with error handling.
-    
-    Args:
-        images (list): The images to save.
-        output_path (str): The path to save the images.
-        original_filename (str): Original filename without extension.
-        prefix (str): Prefix for image filenames.
-    """
-    try:
-        os.makedirs(output_path, exist_ok=True)
-        for i, image in enumerate(images):
-            # Use original filename with sequential number
-            image.save(f"{output_path}/{original_filename}_{prefix}_{i:03d}.png")
-        return len(images)
-    except Exception as e:
-        raise Exception(f"Failed to save images: {str(e)}")
-
-def save_combined_variations(variations, output_path, original_filename):
-    """
-    Save combined variations to a given path.
-    
-    Args:
-        variations (list): List of dictionaries with image and parameters.
-        output_path (str): The path to save the images.
-        original_filename (str): Original filename without extension.
-    """
-    try:
-        os.makedirs(output_path, exist_ok=True)
-        for i, var in enumerate(variations):
-            # Use original filename with hue and saturation values
-            filename = f"{original_filename}_{i:03d}.png"
-            # Replace special characters in filename
-            filename = filename.replace("°", "deg").replace("%", "pct")
-            
-            # Explicitly ensure transparency is preserved by setting format based on mode
-            if var['image'].mode == 'RGBA':
-                var['image'].save(f"{output_path}/{filename}", format="PNG")
-            else:
-                var['image'].save(f"{output_path}/{filename}")
-        return len(variations)
-    except Exception as e:
-        raise Exception(f"Failed to save combined variations: {str(e)}")
 
 class ColorVariationApp(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self):
